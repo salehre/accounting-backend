@@ -2,31 +2,60 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasApiTokens;
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
+    // Our own table (see db/sql/001_core.sql): no updated_at column,
+    // and the password column is called password_hash.
+    protected $table = 'users';
+
+    public $timestamps = false;
+
+    protected $hidden = ['password_hash'];
+
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'is_active' => 'boolean',
+            'last_login_at' => 'datetime',
+            'created_at' => 'datetime',
         ];
+    }
+
+    public function getAuthPassword(): string
+    {
+        return $this->password_hash;
+    }
+
+    public function getAuthPasswordName(): string
+    {
+        return 'password_hash';
+    }
+
+    public function role(): BelongsTo
+    {
+        return $this->belongsTo(Role::class);
+    }
+
+    // Permissions look like "entries.read". "*" grants everything,
+    // and "entries.*" grants every permission starting with "entries.".
+    public function hasPermission(string $required): bool
+    {
+        foreach ($this->role->permissions ?? [] as $granted) {
+            if ($granted === '*' || $granted === $required) {
+                return true;
+            }
+            if (str_ends_with($granted, '.*')
+                && str_starts_with($required, substr($granted, 0, -1))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
