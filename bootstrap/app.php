@@ -2,6 +2,8 @@
 
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\RequirePermission;
+use App\Support\DatabaseErrors;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -27,4 +29,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson()
         );
+
+        // Business rules enforced by PostgreSQL (balance, immutability, closed
+        // fiscal year...) arrive as database errors. Turn them into clean answers.
+        $exceptions->render(function (QueryException $e, Request $request) {
+            if (! ($request->is('api/*') || $request->expectsJson())) {
+                return null;
+            }
+
+            $mapped = DatabaseErrors::map($e);
+            if ($mapped === null) {
+                return null; // unknown database error: let Laravel answer with a 500
+            }
+
+            return response()->json(['message' => $mapped['message']], $mapped['status']);
+        });
     })->create();
