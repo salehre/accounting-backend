@@ -1,0 +1,318 @@
+{
+    "info": {
+        "name": "Accounting API - Journal entries",
+        "description": "Run AFTER: php artisan db:seed --class=DemoAccountingSeeder. Uses the same environment as the auth collection. Before each run: php artisan cache:clear",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": { "type": "text/javascript", "exec": ["pm.request.headers.upsert({ key: 'Accept', value: 'application/json' });"] }
+        }
+    ],
+    "item": [
+        {
+            "name": "00 Login admin",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));",
+                "if (pm.response.code === 200) pm.environment.set('adminToken', pm.response.json().token);"
+            ] } }],
+            "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [],
+                "body": { "mode": "raw", "raw": "{\"username\":\"{{adminUsername}}\",\"password\":\"{{adminPassword}}\",\"device_name\":\"postman\"}", "options": { "raw": { "language": "json" } } },
+                "url": "{{baseUrl}}/auth/token" }
+        },
+        {
+            "name": "01 Login viewer",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));",
+                "if (pm.response.code === 200) pm.environment.set('viewerToken', pm.response.json().token);"
+            ] } }],
+            "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [],
+                "body": { "mode": "raw", "raw": "{\"username\":\"{{viewerUsername}}\",\"password\":\"{{viewerPassword}}\",\"device_name\":\"postman\"}", "options": { "raw": { "language": "json" } } },
+                "url": "{{baseUrl}}/auth/token" }
+        },
+        {
+            "name": "02 Fiscal years",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));",
+                "const open = pm.response.json().find(y => y.status === 'open');",
+                "pm.test('an open fiscal year exists (run the demo seeder first)', () => pm.expect(open).to.not.be.undefined);",
+                "if (open) pm.environment.set('fiscalYearId', open.id);"
+            ] } }],
+            "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/fiscal-years" }
+        },
+        {
+            "name": "03 Accounts",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));",
+                "const list = pm.response.json();",
+                "const idOf = (code) => (list.find(a => a.code === code) || {}).id;",
+                "pm.test('demo accounts exist', () => pm.expect([idOf('1'), idOf('1101'), idOf('1102'), idOf('1103')]).to.not.include(undefined));",
+                "pm.environment.set('accGroup', idOf('1'));",
+                "pm.environment.set('accCash', idOf('1101'));",
+                "pm.environment.set('accBank', idOf('1102'));",
+                "pm.environment.set('accReceivable', idOf('1103'));"
+            ] } }],
+            "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/accounts" }
+        },
+        {
+            "name": "04 Detail accounts",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));",
+                "const list = pm.response.json();",
+                "pm.test('a detail account exists', () => pm.expect(list.length).to.be.above(0));",
+                "if (list.length) pm.environment.set('detailId', list[0].id);"
+            ] } }],
+            "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/detail-accounts" }
+        },
+        {
+            "name": "05 Create draft (balanced)",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                "const e = pm.response.json();",
+                "pm.test('it is a draft without a number', () => { pm.expect(e.status).to.eql('draft'); pm.expect(e.number).to.eql(null); });",
+                "pm.test('it is balanced (500000)', () => { pm.expect(e.isBalanced).to.eql(true); pm.expect(e.totalDebit).to.eql(500000); });",
+                "pm.environment.set('entryId', e.id);"
+            ] } }],
+            "request": { "method": "POST", "header": [],
+                "body": { "mode": "raw", "raw": "{\"fiscalYearId\":{{fiscalYearId}},\"entryDate\":\"2026-10-28\",\"description\":\"Postman test entry\",\"lines\":[{\"accountId\":{{accCash}},\"debit\":500000},{\"accountId\":{{accBank}},\"credit\":500000}]}", "options": { "raw": { "language": "json" } } },
+                "url": "{{baseUrl}}/entries" }
+        },
+        {
+            "name": "06 Show draft",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));",
+                "const e = pm.response.json();",
+                "pm.test('two lines in order', () => { pm.expect(e.lines.length).to.eql(2); pm.expect(e.lines[0].accountCode).to.eql('1101'); pm.expect(e.lines[1].accountCode).to.eql('1102'); });",
+                "pm.test('amounts are numbers', () => { pm.expect(e.lines[0].debit).to.eql(500000); pm.expect(e.lines[1].credit).to.eql(500000); });",
+                "pm.test('date stays a plain string', () => pm.expect(e.entryDate).to.eql('2026-10-28'));"
+            ] } }],
+            "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/entries/{{entryId}}" }
+        },
+        {
+            "name": "07 List drafts",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));",
+                "const j = pm.response.json();",
+                "pm.test('contains our draft', () => pm.expect(j.items.map(i => i.id)).to.include(Number(pm.environment.get('entryId'))));",
+                "pm.test('has pagination info', () => { pm.expect(j.page).to.eql(1); pm.expect(j.total).to.be.above(0); });"
+            ] } }],
+            "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/entries?status=draft&fiscalYearId={{fiscalYearId}}" }
+        },
+        {
+            "name": "08 Create draft (unbalanced)",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('drafts may be unbalanced (201)', () => pm.response.to.have.status(201));",
+                "const e = pm.response.json();",
+                "pm.test('isBalanced is false', () => pm.expect(e.isBalanced).to.eql(false));",
+                "pm.environment.set('badEntryId', e.id);"
+            ] } }],
+            "request": { "method": "POST", "header": [],
+                "body": { "mode": "raw", "raw": "{\"fiscalYearId\":{{fiscalYearId}},\"entryDate\":\"2026-10-28\",\"lines\":[{\"accountId\":{{accCash}},\"debit\":500000},{\"accountId\":{{accBank}},\"credit\":400000}]}", "options": { "raw": { "language": "json" } } },
+                "url": "{{baseUrl}}/entries" }
+        },
+        {
+            "name": "09 Post unbalanced entry (expect 422)",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('422', () => pm.response.to.have.status(422));",
+                "pm.test('says not balanced', () => pm.expect(pm.response.json().message).to.include('not balanced'));"
+            ] } }],
+            "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/entries/{{badEntryId}}/post" }
+        },
+        {
+            "name": "10 Delete the unbalanced draft",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));",
+                "pm.test('ok', () => pm.expect(pm.response.json().ok).to.eql(true));"
+            ] } }],
+            "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/entries/{{badEntryId}}" }
+        },
+        {
+            "name": "11 Validation: line with both debit and credit (expect 422)",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('422', () => pm.response.to.have.status(422));",
+                "pm.test('error points at lines.0', () => pm.expect(pm.response.json().errors).to.have.property('lines.0'));"
+            ] } }],
+            "request": { "method": "POST", "header": [],
+                "body": { "mode": "raw", "raw": "{\"fiscalYearId\":{{fiscalYearId}},\"entryDate\":\"2026-10-28\",\"lines\":[{\"accountId\":{{accCash}},\"debit\":100,\"credit\":100},{\"accountId\":{{accBank}},\"credit\":100}]}", "options": { "raw": { "language": "json" } } },
+                "url": "{{baseUrl}}/entries" }
+        },
+        {
+            "name": "12 Validation: only one line (expect 422)",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('422', () => pm.response.to.have.status(422));",
+                "pm.test('error points at lines', () => pm.expect(pm.response.json().errors).to.have.property('lines'));"
+            ] } }],
+            "request": { "method": "POST", "header": [],
+                "body": { "mode": "raw", "raw": "{\"fiscalYearId\":{{fiscalYearId}},\"entryDate\":\"2026-10-28\",\"lines\":[{\"accountId\":{{accCash}},\"debit\":100}]}", "options": { "raw": { "language": "json" } } },
+                "url": "{{baseUrl}}/entries" }
+        },
+        {
+            "name": "13 Validation: wrong date format (expect 422)",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('422', () => pm.response.to.have.status(422));",
+                "pm.test('error points at entryDate', () => pm.expect(pm.response.json().errors).to.have.property('entryDate'));"
+            ] } }],
+            "request": { "method": "POST", "header": [],
+                "body": { "mode": "raw", "raw": "{\"fiscalYearId\":{{fiscalYearId}},\"entryDate\":\"28-10-2026\",\"lines\":[{\"accountId\":{{accCash}},\"debit\":100},{\"accountId\":{{accBank}},\"credit\":100}]}", "options": { "raw": { "language": "json" } } },
+                "url": "{{baseUrl}}/entries" }
+        },
+        {
+            "name": "14 Post the balanced entry",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));",
+                "const e = pm.response.json();",
+                "pm.test('is posted and numbered', () => { pm.expect(e.status).to.eql('posted'); pm.expect(e.number).to.be.above(0); });",
+                "pm.environment.set('postedNumber', e.number);"
+            ] } }],
+            "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/entries/{{entryId}}/post" }
+        },
+        {
+            "name": "15 Post again (expect 409)",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+            ] } }],
+            "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/entries/{{entryId}}/post" }
+        },
+        {
+            "name": "16 Delete a posted entry (expect 422)",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('422', () => pm.response.to.have.status(422));",
+                "pm.test('says posted entries cannot be deleted', () => pm.expect(pm.response.json().message).to.include('cannot be deleted'));"
+            ] } }],
+            "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/entries/{{entryId}}" }
+        },
+        {
+            "name": "17 Reverse the posted entry",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('201', () => pm.response.to.have.status(201));",
+                "const e = pm.response.json();",
+                "pm.test('reversal is a draft pointing at the original', () => { pm.expect(e.status).to.eql('draft'); pm.expect(e.reversesEntryId).to.eql(Number(pm.environment.get('entryId'))); });",
+                "pm.test('debit and credit are swapped', () => { pm.expect(e.lines[0].credit).to.eql(500000); pm.expect(e.lines[1].debit).to.eql(500000); });",
+                "pm.environment.set('reversalId', e.id);"
+            ] } }],
+            "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/entries/{{entryId}}/reverse" }
+        },
+        {
+            "name": "18 Reverse again (expect 409)",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+            ] } }],
+            "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/entries/{{entryId}}/reverse" }
+        },
+        {
+            "name": "19 Post the reversal",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));",
+                "const e = pm.response.json();",
+                "pm.test('numbers keep increasing', () => { pm.expect(e.status).to.eql('posted'); pm.expect(e.number).to.be.above(Number(pm.environment.get('postedNumber'))); });"
+            ] } }],
+            "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/entries/{{reversalId}}/post" }
+        },
+        {
+            "name": "20 Create draft on a non-postable (group) account",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('201', () => pm.response.to.have.status(201));",
+                "pm.environment.set('tmpEntryId', pm.response.json().id);"
+            ] } }],
+            "request": { "method": "POST", "header": [],
+                "body": { "mode": "raw", "raw": "{\"fiscalYearId\":{{fiscalYearId}},\"entryDate\":\"2026-10-28\",\"lines\":[{\"accountId\":{{accGroup}},\"debit\":100},{\"accountId\":{{accBank}},\"credit\":100}]}", "options": { "raw": { "language": "json" } } },
+                "url": "{{baseUrl}}/entries" }
+        },
+        {
+            "name": "21 Post it (expect 422)",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('422', () => pm.response.to.have.status(422));",
+                "pm.test('says invalid line', () => pm.expect(pm.response.json().message).to.include('invalid line'));"
+            ] } }],
+            "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/entries/{{tmpEntryId}}/post" }
+        },
+        {
+            "name": "22 Delete that draft",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));"
+            ] } }],
+            "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/entries/{{tmpEntryId}}" }
+        },
+        {
+            "name": "23 Create draft missing the required detail account",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('201', () => pm.response.to.have.status(201));",
+                "pm.environment.set('tmpEntryId', pm.response.json().id);"
+            ] } }],
+            "request": { "method": "POST", "header": [],
+                "body": { "mode": "raw", "raw": "{\"fiscalYearId\":{{fiscalYearId}},\"entryDate\":\"2026-10-28\",\"lines\":[{\"accountId\":{{accReceivable}},\"debit\":100000},{\"accountId\":{{accCash}},\"credit\":100000}]}", "options": { "raw": { "language": "json" } } },
+                "url": "{{baseUrl}}/entries" }
+        },
+        {
+            "name": "24 Post it (expect 422)",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('422', () => pm.response.to.have.status(422));",
+                "pm.test('says invalid line', () => pm.expect(pm.response.json().message).to.include('invalid line'));"
+            ] } }],
+            "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/entries/{{tmpEntryId}}/post" }
+        },
+        {
+            "name": "25 Delete that draft",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));"
+            ] } }],
+            "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/entries/{{tmpEntryId}}" }
+        },
+        {
+            "name": "26 Create draft WITH the detail account",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('201', () => pm.response.to.have.status(201));",
+                "const e = pm.response.json();",
+                "pm.test('detail account name is returned', () => pm.expect(e.lines[0].detailName).to.be.a('string'));",
+                "pm.environment.set('tmpEntryId', e.id);"
+            ] } }],
+            "request": { "method": "POST", "header": [],
+                "body": { "mode": "raw", "raw": "{\"fiscalYearId\":{{fiscalYearId}},\"entryDate\":\"2026-10-28\",\"lines\":[{\"accountId\":{{accReceivable}},\"detailId\":{{detailId}},\"debit\":100000},{\"accountId\":{{accCash}},\"credit\":100000}]}", "options": { "raw": { "language": "json" } } },
+                "url": "{{baseUrl}}/entries" }
+        },
+        {
+            "name": "27 Post it (expect 200)",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));",
+                "pm.test('posted', () => pm.expect(pm.response.json().status).to.eql('posted'));"
+            ] } }],
+            "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/entries/{{tmpEntryId}}/post" }
+        },
+        {
+            "name": "28 Viewer: create entry (expect 403)",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('403', () => pm.response.to.have.status(403));",
+                "pm.test('message explains why', () => pm.expect(pm.response.json().message).to.include('permission'));"
+            ] } }],
+            "request": { "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{viewerToken}}", "type": "string" }] },
+                "method": "POST", "header": [],
+                "body": { "mode": "raw", "raw": "{\"fiscalYearId\":{{fiscalYearId}},\"entryDate\":\"2026-10-28\",\"lines\":[{\"accountId\":{{accCash}},\"debit\":100},{\"accountId\":{{accBank}},\"credit\":100}]}", "options": { "raw": { "language": "json" } } },
+                "url": "{{baseUrl}}/entries" }
+        },
+        {
+            "name": "29 Viewer: list entries (expect 200)",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));"
+            ] } }],
+            "request": { "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{viewerToken}}", "type": "string" }] },
+                "method": "GET", "header": [], "url": "{{baseUrl}}/entries" }
+        },
+        {
+            "name": "30 Viewer: post entry (expect 403)",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('403', () => pm.response.to.have.status(403));"
+            ] } }],
+            "request": { "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{viewerToken}}", "type": "string" }] },
+                "method": "POST", "header": [], "url": "{{baseUrl}}/entries/{{entryId}}/post" }
+        },
+        {
+            "name": "31 No token: list entries (expect 401)",
+            "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+                "pm.test('401', () => pm.response.to.have.status(401));"
+            ] } }],
+            "request": { "auth": { "type": "noauth" }, "method": "GET", "header": [], "url": "{{baseUrl}}/entries" }
+        }
+    ]
+}
