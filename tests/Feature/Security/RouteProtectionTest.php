@@ -3,6 +3,7 @@
 namespace Tests\Feature\Security;
 
 use App\Models\Role;
+use App\Support\Permissions;
 use Illuminate\Routing\Route as LaravelRoute;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
@@ -44,6 +45,26 @@ class RouteProtectionTest extends TestCase
         return null;
     }
 
+    /** "*" and "entries.*" style wildcards are allowed if they match the catalog. */
+    private function isKnownPermission(string $permission): bool
+    {
+        if ($permission === '*' || in_array($permission, Permissions::ALL, true)) {
+            return true;
+        }
+
+        if (str_ends_with($permission, '.*')) {
+            $prefix = substr($permission, 0, -1); // keeps the trailing dot
+
+            foreach (Permissions::ALL as $known) {
+                if (str_starts_with($known, $prefix)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     public function test_every_api_route_requires_a_logged_in_active_user_unless_it_is_public(): void
     {
         $protected = 0;
@@ -76,10 +97,8 @@ class RouteProtectionTest extends TestCase
         }
     }
 
-    public function test_permission_names_used_by_routes_are_granted_to_some_role(): void
+    public function test_routes_only_use_permissions_from_the_catalog(): void
     {
-        $granted = Role::query()->pluck('permissions')->flatten()->unique()->all();
-
         foreach ($this->apiRoutes() as $route) {
             $permission = $this->permissionOf($route);
             if ($permission === null) {
@@ -88,9 +107,32 @@ class RouteProtectionTest extends TestCase
 
             $this->assertContains(
                 $permission,
-                $granted,
-                $this->label($route)." needs \"{$permission}\", which no role has (typo?)",
+                Permissions::ALL,
+                $this->label($route)." needs \"{$permission}\", which is not in App\\Support\\Permissions (typo?)",
             );
+        }
+    }
+
+    public function test_roles_only_grant_permissions_from_the_catalog(): void
+    {
+        foreach (Role::query()->get() as $role) {
+            foreach ($role->permissions as $permission) {
+                $this->assertTrue(
+                    $this->isKnownPermission($permission),
+                    "Role \"{$role->name}\" grants \"{$permission}\", which is not in App\\Support\\Permissions (typo?)",
+                );
+            }
+        }
+    }
+
+    public function test_only_the_admin_role_has_the_wildcard_permission(): void
+    {
+        foreach (Role::query()->get() as $role) {
+            if ($role->name === 'admin') {
+                $this->assertSame(['*'], $role->permissions);
+            } else {
+                $this->assertNotContains('*', $role->permissions, "Role \"{$role->name}\" must not have full access");
+            }
         }
     }
 

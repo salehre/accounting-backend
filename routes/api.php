@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\FiscalYearController;
 use App\Http\Controllers\JournalEntryController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
@@ -27,7 +28,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('change-password', [AuthController::class, 'changePassword']);
     });
 
-    // Every route below must also declare the permission it needs.
+    // Every route below must also declare the permission it needs
+    // (a test fails if one is missing or uses a name that is not in App\Support\Permissions).
     Route::get('accounts', [AccountController::class, 'index'])
         ->middleware('permission:accounts.read');
     Route::get('detail-accounts', [AccountController::class, 'detailAccounts'])
@@ -47,4 +49,18 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         ->whereNumber('id')->middleware('permission:entries.post');
     Route::post('entries/{id}/reverse', [JournalEntryController::class, 'reverse'])
         ->whereNumber('id')->middleware('permission:entries.reverse');
+
+    // User management (administrators only)
+    Route::get('roles', [UserController::class, 'roles'])
+        ->middleware('permission:users.manage');
+    Route::get('users', [UserController::class, 'index'])
+        ->middleware('permission:users.manage');
+    Route::post('users', [UserController::class, 'store'])
+        ->middleware('permission:users.manage');
+    Route::get('users/{id}', [UserController::class, 'show'])
+        ->whereNumber('id')->middleware('permission:users.manage');
+    Route::patch('users/{id}', [UserController::class, 'update'])
+        ->whereNumber('id')->middleware('permission:users.manage');
+    Route::post('users/{id}/reset-password', [UserController::class, 'resetPassword'])
+        ->whereNumber('id')->middleware('permission:users.manage');
 });
