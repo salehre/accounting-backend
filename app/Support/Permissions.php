@@ -1,6 +1,5 @@
 <?php
 
-
 namespace App\Support;
 
 /**
@@ -12,6 +11,7 @@ final class Permissions
 {
     public const ALL = [
         'accounts.read',
+        'accounts.manage',
         'entries.read',
         'entries.write',
         'entries.post',
