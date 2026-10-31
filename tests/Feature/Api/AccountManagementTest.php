@@ -106,9 +106,14 @@ class AccountManagementTest extends TestCase
         ];
 
         foreach ($invalid as $case => [$override, $errorKey]) {
-            $this->createAccount($override + ['name' => 'Test', 'nature' => 'debit'])
-                ->assertStatus(422)
-                ->assertJsonValidationErrors($errorKey, 'The case "'.$case.'" was not rejected for "'.$errorKey.'"');
+            $response = $this->createAccount($override + ['name' => 'Test', 'nature' => 'debit']);
+
+            $response->assertStatus(422);
+            $this->assertArrayHasKey(
+                $errorKey,
+                $response->json('errors') ?? [],
+                "The case \"{$case}\" was not rejected for \"{$errorKey}\"",
+            );
         }
 
         $this->assertSame(3, DB::table('accounts')->count()); // nothing was saved

@@ -52,8 +52,21 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::delete('detail-accounts/{id}', [DetailAccountController::class, 'destroy'])
         ->whereNumber('id')->middleware('permission:accounts.manage');
 
+    // Fiscal years: accountants manage them, only administrators close and reopen
     Route::get('fiscal-years', [FiscalYearController::class, 'index'])
         ->middleware('permission:entries.read');
+    Route::post('fiscal-years', [FiscalYearController::class, 'store'])
+        ->middleware('permission:fiscal-years.manage');
+    Route::patch('fiscal-years/{id}', [FiscalYearController::class, 'update'])
+        ->whereNumber('id')->middleware('permission:fiscal-years.manage');
+    Route::delete('fiscal-years/{id}', [FiscalYearController::class, 'destroy'])
+        ->whereNumber('id')->middleware('permission:fiscal-years.manage');
+    Route::get('fiscal-years/{id}/close-check', [FiscalYearController::class, 'closeCheck'])
+        ->whereNumber('id')->middleware('permission:fiscal-years.close');
+    Route::post('fiscal-years/{id}/close', [FiscalYearController::class, 'close'])
+        ->whereNumber('id')->middleware('permission:fiscal-years.close');
+    Route::post('fiscal-years/{id}/reopen', [FiscalYearController::class, 'reopen'])
+        ->whereNumber('id')->middleware('permission:fiscal-years.close');
 
     // Journal entries
     Route::get('entries', [JournalEntryController::class, 'index'])

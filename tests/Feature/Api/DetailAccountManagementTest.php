@@ -60,8 +60,14 @@ class DetailAccountManagementTest extends TestCase
         ];
 
         foreach ($invalid as $case => [$payload, $errorKey]) {
-            $this->createDetail($payload)->assertStatus(422)
-                ->assertJsonValidationErrors($errorKey, 'The case "'.$case.'" was not rejected for "'.$errorKey.'"');
+            $answer = $this->createDetail($payload);
+
+            $answer->assertStatus(422);
+            $this->assertArrayHasKey(
+                $errorKey,
+                $answer->json('errors') ?? [],
+                "The case \"{$case}\" was not rejected for \"{$errorKey}\"",
+            );
         }
 
         $this->assertSame(2, DB::table('detail_accounts')->count());

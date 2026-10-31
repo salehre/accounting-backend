@@ -16,6 +16,8 @@ final class Permissions
         'entries.write',
         'entries.post',
         'entries.reverse',
+        'fiscal-years.manage',
+        'fiscal-years.close',
         'reports.read',
         'users.manage',
     ];

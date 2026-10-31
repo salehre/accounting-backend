@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreJournalEntryRequest extends FormRequest
 {
@@ -34,11 +35,12 @@ class StoreJournalEntryRequest extends FormRequest
         }
     }
 
-    /** @return array<string, array<int, string>> */
+    /** @return array<string, array<int, mixed>> */
     public function rules(): array
     {
         return [
-            'fiscalYearId' => ['required', 'integer', 'exists:fiscal_years,id'],
+            // a closed fiscal year takes no new entries, not even drafts
+            'fiscalYearId' => ['required', 'integer', Rule::exists('fiscal_years', 'id')->where('status', 'open')],
             'entryDate' => ['required', 'date_format:Y-m-d'],
             'description' => ['nullable', 'string', 'max:1000'],
             'lines' => ['required', 'array', 'min:2', 'max:500'],
@@ -47,6 +49,14 @@ class StoreJournalEntryRequest extends FormRequest
             'lines.*.description' => ['nullable', 'string', 'max:500'],
             'lines.*.debit' => ['required', 'integer', 'min:0', 'max:'.self::MAX_AMOUNT],
             'lines.*.credit' => ['required', 'integer', 'min:0', 'max:'.self::MAX_AMOUNT],
+        ];
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return [
+            'fiscalYearId.exists' => 'The fiscal year does not exist or is closed.',
         ];
     }
 
