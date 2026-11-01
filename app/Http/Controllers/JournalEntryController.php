@@ -6,6 +6,7 @@ use App\Http\Requests\StoreJournalEntryRequest;
 use App\Services\JournalEntryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class JournalEntryController extends Controller
 {
@@ -42,6 +43,7 @@ class JournalEntryController extends Controller
 
     public function destroy(Request $request, int $id): JsonResponse
     {
+        $this->assertNotYearEnd($id);
         $this->entries->deleteDraft($id, $request->user()->id);
 
         return response()->json(['ok' => true]);
@@ -49,6 +51,7 @@ class JournalEntryController extends Controller
 
     public function post(Request $request, int $id): JsonResponse
     {
+        $this->assertNotYearEnd($id);
         $this->entries->post($id, $request->user()->id);
 
         return response()->json($this->entries->find($id));
@@ -56,6 +59,8 @@ class JournalEntryController extends Controller
 
     public function reverse(Request $request, int $id): JsonResponse
     {
+        $this->assertNotYearEnd($id);
+
         $data = $request->validate([
             'date' => ['nullable', 'date_format:Y-m-d'],
         ]);
@@ -63,5 +68,15 @@ class JournalEntryController extends Controller
         $reversalId = $this->entries->reverse($id, $request->user()->id, $data['date'] ?? null);
 
         return response()->json($this->entries->find($reversalId), 201);
+    }
+
+    /** The four year-end entries are only handled together, from the fiscal year's year-end screen. */
+    private function assertNotYearEnd(int $id): void
+    {
+        $type = DB::table('journal_entries')->where('id', $id)->value('source_type');
+
+        if (is_string($type) && str_starts_with($type, 'year_end_')) {
+            abort(422, 'Year-end entries are managed from the fiscal year screen, not one by one.');
+        }
     }
 }

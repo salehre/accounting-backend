@@ -82,7 +82,7 @@ class YearEndPreviewTest extends TestCase
     }
 
     /** @param array<int, array{0: string, 1: int, 2: int}> $lines [account key, debit, credit] */
-    private function draftEntry(array $lines, string $date = '2026-06-01'): int
+    private function makeDraft(array $lines, string $date = '2026-06-01'): int
     {
         return app(JournalEntryService::class)->createDraft([
             'fiscalYearId' => $this->year,
@@ -99,7 +99,7 @@ class YearEndPreviewTest extends TestCase
     /** @param array<int, array{0: string, 1: int, 2: int}> $lines */
     private function postEntry(array $lines, string $date = '2026-06-01'): void
     {
-        app(JournalEntryService::class)->post($this->draftEntry($lines, $date), $this->actor->id);
+        app(JournalEntryService::class)->post($this->makeDraft($lines, $date), $this->actor->id);
     }
 
     private function preview(?int $year = null, ?string $token = null): TestResponse
@@ -305,7 +305,7 @@ class YearEndPreviewTest extends TestCase
     {
         $this->configureSettings();
         $this->profitScenario();
-        $this->draftEntry([['cash', 100, 0], ['capital', 0, 100]]);
+        $this->makeDraft([['cash', 100, 0], ['capital', 0, 100]]);
 
         $codes = fn () => array_column($this->preview()->assertOk()->json('blockers'), 'code');
 

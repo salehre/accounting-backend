@@ -64,7 +64,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::put('accounting-settings', [AccountingSetupController::class, 'updateSettings'])
         ->middleware('permission:accounts.manage');
 
-    // Fiscal years: accountants manage them, only administrators close and reopen
+    // Fiscal years: accountants manage them, only administrators close, reopen and post year-end entries
     Route::get('fiscal-years', [FiscalYearController::class, 'index'])
         ->middleware('permission:entries.read');
     Route::post('fiscal-years', [FiscalYearController::class, 'store'])
@@ -79,8 +79,18 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         ->whereNumber('id')->middleware('permission:fiscal-years.close');
     Route::post('fiscal-years/{id}/reopen', [FiscalYearController::class, 'reopen'])
         ->whereNumber('id')->middleware('permission:fiscal-years.close');
+
+    // Year-end entries: accountants prepare, administrators post and reverse
     Route::get('fiscal-years/{id}/year-end', [YearEndController::class, 'preview'])
         ->whereNumber('id')->middleware('permission:fiscal-years.manage');
+    Route::post('fiscal-years/{id}/year-end/generate', [YearEndController::class, 'generate'])
+        ->whereNumber('id')->middleware('permission:fiscal-years.manage');
+    Route::delete('fiscal-years/{id}/year-end', [YearEndController::class, 'discard'])
+        ->whereNumber('id')->middleware('permission:fiscal-years.manage');
+    Route::post('fiscal-years/{id}/year-end/post', [YearEndController::class, 'post'])
+        ->whereNumber('id')->middleware('permission:fiscal-years.close');
+    Route::post('fiscal-years/{id}/year-end/reverse', [YearEndController::class, 'reverse'])
+        ->whereNumber('id')->middleware('permission:fiscal-years.close');
 
     // Journal entries
     Route::get('entries', [JournalEntryController::class, 'index'])
