@@ -1,11 +1,13 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AccountingSetupController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DetailAccountController;
 use App\Http\Controllers\FiscalYearController;
 use App\Http\Controllers\JournalEntryController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\YearEndController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
@@ -52,6 +54,16 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::delete('detail-accounts/{id}', [DetailAccountController::class, 'destroy'])
         ->whereNumber('id')->middleware('permission:accounts.manage');
 
+    // Account types (asset, liability...) and the technical accounts used at year end
+    Route::get('account-categories', [AccountingSetupController::class, 'categories'])
+        ->middleware('permission:accounts.read');
+    Route::put('account-categories/{id}', [AccountingSetupController::class, 'setCategory'])
+        ->whereNumber('id')->middleware('permission:accounts.manage');
+    Route::get('accounting-settings', [AccountingSetupController::class, 'settings'])
+        ->middleware('permission:accounts.read');
+    Route::put('accounting-settings', [AccountingSetupController::class, 'updateSettings'])
+        ->middleware('permission:accounts.manage');
+
     // Fiscal years: accountants manage them, only administrators close and reopen
     Route::get('fiscal-years', [FiscalYearController::class, 'index'])
         ->middleware('permission:entries.read');
@@ -67,6 +79,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         ->whereNumber('id')->middleware('permission:fiscal-years.close');
     Route::post('fiscal-years/{id}/reopen', [FiscalYearController::class, 'reopen'])
         ->whereNumber('id')->middleware('permission:fiscal-years.close');
+    Route::get('fiscal-years/{id}/year-end', [YearEndController::class, 'preview'])
+        ->whereNumber('id')->middleware('permission:fiscal-years.manage');
 
     // Journal entries
     Route::get('entries', [JournalEntryController::class, 'index'])
