@@ -6,7 +6,7 @@ use App\Services\JournalEntryService;
 use Illuminate\Support\Facades\DB;
 
 /**
- * A small chart of accounts, three fiscal years' worth of setup and helpers to post entries.
+ * A small chart of accounts, two fiscal years and helpers to post entries.
  * Used by the tests of the year-end entries.
  */
 trait BuildsYearEndLedger
@@ -72,7 +72,7 @@ trait BuildsYearEndLedger
     }
 
     /** @param array<int, array{0: string, 1: int, 2: int}> $lines [account key, debit, credit] */
-    private function draftEntry(array $lines, string $date = '2026-06-01', ?int $fiscalYearId = null): int
+    private function makeDraft(array $lines, string $date = '2026-06-01', ?int $fiscalYearId = null): int
     {
         return app(JournalEntryService::class)->createDraft([
             'fiscalYearId' => $fiscalYearId ?? $this->year,
@@ -89,7 +89,7 @@ trait BuildsYearEndLedger
     /** @param array<int, array{0: string, 1: int, 2: int}> $lines */
     private function postEntry(array $lines, string $date = '2026-06-01', ?int $fiscalYearId = null): void
     {
-        app(JournalEntryService::class)->post($this->draftEntry($lines, $date, $fiscalYearId), $this->actor->id);
+        app(JournalEntryService::class)->post($this->makeDraft($lines, $date, $fiscalYearId), $this->actor->id);
     }
 
     /** Capital 1,000,000 + sales 500,000 - rent 200,000: a profit of 300,000. */
