@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DetailAccountController;
 use App\Http\Controllers\FiscalYearController;
 use App\Http\Controllers\JournalEntryController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\YearEndController;
 use Illuminate\Support\Facades\DB;
@@ -105,6 +106,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         ->whereNumber('id')->middleware('permission:entries.post');
     Route::post('entries/{id}/reverse', [JournalEntryController::class, 'reverse'])
         ->whereNumber('id')->middleware('permission:entries.reverse');
+
+    // Reports
+    Route::get('reports/trial-balance', [ReportController::class, 'trialBalance'])
+        ->middleware('permission:reports.read');
+    Route::get('reports/ledger', [ReportController::class, 'ledger'])
+        ->middleware('permission:reports.read');
 
     // User management (administrators only)
     Route::get('roles', [UserController::class, 'roles'])
