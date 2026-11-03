@@ -40,8 +40,7 @@ final class LedgerIntegrity
                     OR e.total_credit <> COALESCE((SELECT sum(l.credit) FROM journal_lines l WHERE l.entry_id = e.id), 0))
             SQL)->n;
 
-        $differences = <<<'SQL'
-              FROM (SQL;
+        // Stored totals against the totals recomputed from the lines (in both directions)
         $differences = '
               FROM ('.self::RECOMPUTED.') r
               FULL OUTER JOIN account_daily_totals s
