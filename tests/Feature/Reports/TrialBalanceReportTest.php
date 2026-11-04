@@ -40,6 +40,18 @@ class TrialBalanceReportTest extends TestCase
         return collect($response->json('rows'))->keyBy('code')->all();
     }
 
+    /**
+     * The account codes of a keyed list. PHP turns numeric string keys such as '1101' into integers,
+     * so they are converted back to strings before comparing.
+     *
+     * @param array<string|int, mixed> $rows
+     * @return array<int, string>
+     */
+    private function codesOf(array $rows): array
+    {
+        return array_map('strval', array_keys($rows));
+    }
+
     /** @param array<string, mixed> $row */
     private function numbers(array $row): array
     {
@@ -66,7 +78,7 @@ class TrialBalanceReportTest extends TestCase
         $rows = $this->byCode($response);
 
         // technical accounts without any movement are hidden
-        $this->assertSame(['1101', '3101', '4101', '5101'], array_keys($rows));
+        $this->assertSame(['1101', '3101', '4101', '5101'], $this->codesOf($rows));
 
         //                                  opening      period              closing
         $this->assertSame([0, 0, 1500000, 200000, 1300000, 0], $this->numbers($rows['1101']));
@@ -89,7 +101,7 @@ class TrialBalanceReportTest extends TestCase
             ->assertJsonPath('balanced', true);
         $rows = $this->byCode($response);
 
-        $this->assertSame(['1101', '3101', '4101', '5101'], array_keys($rows));
+        $this->assertSame(['1101', '3101', '4101', '5101'], $this->codesOf($rows));
         $this->assertSame([1000000, 0, 500000, 200000, 1300000, 0], $this->numbers($rows['1101']));
         $this->assertSame([0, 1000000, 0, 0, 0, 1000000], $this->numbers($rows['3101'])); // no movement, but an opening balance
         $this->assertSame([0, 0, 0, 500000, 0, 500000], $this->numbers($rows['4101']));
@@ -99,21 +111,21 @@ class TrialBalanceReportTest extends TestCase
         $this->assertSame(1000000, $response->json('totals.openingCredit'));
 
         // an early end date leaves out later movements
-        $early = $this->report(['to' => '2026-05-31'])->assertOk();
-        $this->assertSame(['1101', '3101'], array_keys($this->byCode($early)));
-        $this->assertSame([0, 0, 1000000, 0, 1000000, 0], $this->numbers($this->byCode($early)['1101']));
+        $early = $this->byCode($this->report(['to' => '2026-05-31'])->assertOk());
+        $this->assertSame(['1101', '3101'], $this->codesOf($early));
+        $this->assertSame([0, 0, 1000000, 0, 1000000, 0], $this->numbers($early['1101']));
     }
 
     public function test_levels_roll_up_to_the_kol_and_the_group(): void
     {
         $kols = $this->byCode($this->report(['level' => 2])->assertOk()->assertJsonPath('balanced', true));
-        $this->assertSame(['11', '31', '41', '51'], array_keys($kols));
+        $this->assertSame(['11', '31', '41', '51'], $this->codesOf($kols));
         $this->assertSame([0, 0, 1500000, 200000, 1300000, 0], $this->numbers($kols['11']));
         $this->assertSame('Current assets', $kols['11']['name']);
         $this->assertSame(2, $kols['11']['level']);
 
         $groups = $this->byCode($this->report(['level' => 1])->assertOk()->assertJsonPath('balanced', true));
-        $this->assertSame(['1', '3', '4', '5'], array_keys($groups));
+        $this->assertSame(['1', '3', '4', '5'], $this->codesOf($groups));
         $this->assertSame([0, 0, 0, 1000000, 0, 1000000], $this->numbers($groups['3']));
         $this->assertSame(1, $groups['3']['level']);
     }
@@ -125,16 +137,25 @@ class TrialBalanceReportTest extends TestCase
         $response = $this->report(['accountId' => $kol])->assertOk()
             ->assertJsonPath('balanced', null); // a part of the ledger does not have to balance
 
-        $this->assertSame(['1101'], array_keys($this->byCode($response)));
+        $this->assertSame(['1101'], $this->codesOf($this->byCode($response)));
     }
 
     public function test_hide_zero_can_be_turned_off(): void
     {
-        $codes = array_keys($this->byCode($this->report(['hideZero' => 0])->assertOk()));
+        // every movement account is listed now, also the ones that were never used
+        $rows = $this->byCode($this->report(['hideZero' => 0])->assertOk()->assertJsonPath('balanced', true));
+        $codes = $this->codesOf($rows);
 
         $this->assertContains('3102', $codes);
         $this->assertContains('3105', $codes);
         $this->assertCount(8, $codes);
+
+        $this->assertSame([0, 0, 0, 0, 0, 0], $this->numbers($rows['3102']));
+        $this->assertSame([0, 0, 1500000, 200000, 1300000, 0], $this->numbers($rows['1101'])); // unchanged
+
+        // the same at the level of the kol accounts
+        $kols = $this->codesOf($this->byCode($this->report(['level' => 2, 'hideZero' => 0])->assertOk()));
+        $this->assertSame(['11', '31', '41', '51'], $kols);
     }
 
     public function test_detail_accounts(): void

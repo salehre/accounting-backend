@@ -112,6 +112,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         ->middleware('permission:reports.read');
     Route::get('reports/ledger', [ReportController::class, 'ledger'])
         ->middleware('permission:reports.read');
+    Route::get('reports/income-statement', [ReportController::class, 'incomeStatement'])
+        ->middleware('permission:reports.read');
+    Route::get('reports/balance-sheet', [ReportController::class, 'balanceSheet'])
+        ->middleware('permission:reports.read');
+    Route::get('reports/journal', [ReportController::class, 'journal'])
+        ->middleware('permission:reports.read');
 
     // User management (administrators only)
     Route::get('roles', [UserController::class, 'roles'])

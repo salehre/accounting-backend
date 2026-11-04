@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Reports\BalanceSheetReport;
+use App\Services\Reports\IncomeStatementReport;
+use App\Services\Reports\JournalReport;
 use App\Services\Reports\LedgerReport;
 use App\Services\Reports\TrialBalanceReport;
 use Illuminate\Http\JsonResponse;
@@ -56,6 +59,61 @@ class ReportController extends Controller
             $request->boolean('includeClosing'),
             $query['cursor'] ?? null,
             (int) ($query['pageSize'] ?? 50),
+        ));
+    }
+
+    public function incomeStatement(Request $request, IncomeStatementReport $report): JsonResponse
+    {
+        $query = $request->validate([
+            'fiscalYearId' => ['required', 'integer', 'exists:fiscal_years,id'],
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d'],
+            'level' => ['nullable', 'integer', 'in:1,2,3'],
+        ]);
+
+        return response()->json($report->generate(
+            (int) $query['fiscalYearId'],
+            $query['from'] ?? null,
+            $query['to'] ?? null,
+            (int) ($query['level'] ?? 2),
+        ));
+    }
+
+    public function balanceSheet(Request $request, BalanceSheetReport $report): JsonResponse
+    {
+        $query = $request->validate([
+            'fiscalYearId' => ['required', 'integer', 'exists:fiscal_years,id'],
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'level' => ['nullable', 'integer', 'in:1,2,3'],
+        ]);
+
+        return response()->json($report->generate(
+            (int) $query['fiscalYearId'],
+            $query['date'] ?? null,
+            (int) ($query['level'] ?? 2),
+        ));
+    }
+
+    public function journal(Request $request, JournalReport $report): JsonResponse
+    {
+        $query = $request->validate([
+            'fiscalYearId' => ['required', 'integer', 'exists:fiscal_years,id'],
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d'],
+            'fromNumber' => ['nullable', 'integer', 'min:1'],
+            'toNumber' => ['nullable', 'integer', 'min:1'],
+            'cursor' => ['nullable', 'string', 'max:500'],
+            'pageSize' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        return response()->json($report->generate(
+            (int) $query['fiscalYearId'],
+            $query['from'] ?? null,
+            $query['to'] ?? null,
+            isset($query['fromNumber']) ? (int) $query['fromNumber'] : null,
+            isset($query['toNumber']) ? (int) $query['toNumber'] : null,
+            $query['cursor'] ?? null,
+            (int) ($query['pageSize'] ?? 20),
         ));
     }
 }

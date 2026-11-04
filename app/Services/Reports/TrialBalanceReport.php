@@ -48,13 +48,16 @@ final class TrialBalanceReport
             $detailJoin = 'left join detail_accounts d on d.id = t.detail_id';
         }
 
-        // the order of the placeholders: the four sums, then the where clause
-        $bindings = [$from, $from, $from, $to, $from, $to, $fiscalYearId, $to];
-        $where = '';
+        // "Hide zero" reads only the accounts that have movements (inner join, as fast as it can be).
+        // Otherwise every movement account is listed, including the ones that were never used.
+        $joinType = $hideZero ? 'join' : 'left join';
+        $totalsFilter = 't.account_id = m.id and t.fiscal_year_id = ? and t.entry_date <= ?'
+            .($includeClosing ? '' : ' and not t.closing');
 
-        if (! $includeClosing) {
-            $where .= ' and not t.closing';
-        }
+        // the order of the placeholders: the four sums, then the totals filter, then the where clause
+        $bindings = [$from, $from, $from, $to, $from, $to, $fiscalYearId, $to];
+        $where = " and {$alias}.id is not null";
+
         if ($accountId !== null) {
             $where .= ' and (m.id = ? or k.id = ? or g.id = ?)';
             array_push($bindings, $accountId, $accountId, $accountId);
@@ -66,12 +69,12 @@ final class TrialBalanceReport
                     coalesce(sum(t.credit) filter (where t.entry_date < ?), 0)                as open_credit,
                     coalesce(sum(t.debit)  filter (where t.entry_date between ? and ?), 0)    as period_debit,
                     coalesce(sum(t.credit) filter (where t.entry_date between ? and ?), 0)    as period_credit
-               from account_daily_totals t
-               join accounts m on m.id = t.account_id
+               from accounts m
                left join accounts k on k.id = m.parent_id
                left join accounts g on g.id = k.parent_id
+               {$joinType} account_daily_totals t on {$totalsFilter}
                {$detailJoin}
-              where t.fiscal_year_id = ? and t.entry_date <= ? {$where}
+              where m.level = 3 {$where}
               group by {$group}
               order by {$order}
               limit ".(self::MAX_ROWS + 1),
