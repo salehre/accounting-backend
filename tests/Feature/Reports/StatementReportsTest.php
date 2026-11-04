@@ -22,13 +22,11 @@ class StatementReportsTest extends TestCase
         $this->configureSettings();
         $this->reportScenario(); // capital 1,000,000 | sale 500,000 | rent 200,000
     }
-
-    /** @param array<string, mixed> $query */
     private function income(array $query = [], ?string $token = null, ?int $year = null): TestResponse
     {
         return $this->api(
             'GET',
-            '/api/reports/income-statement?'.http_build_query(['fiscalYearId' => $year ?? $this->year, 'level' => 3] + $query),
+            '/api/reports/income-statement?'.http_build_query($query + ['fiscalYearId' => $year ?? $this->year, 'level' => 3]),
             [],
             $token ?? $this->adminToken,
         );
@@ -39,7 +37,7 @@ class StatementReportsTest extends TestCase
     {
         return $this->api(
             'GET',
-            '/api/reports/balance-sheet?'.http_build_query(['fiscalYearId' => $year ?? $this->year, 'level' => 3] + $query),
+            '/api/reports/balance-sheet?'.http_build_query($query + ['fiscalYearId' => $year ?? $this->year, 'level' => 3]),
             [],
             $token ?? $this->adminToken,
         );
@@ -110,11 +108,11 @@ class StatementReportsTest extends TestCase
 
     public function test_the_income_statement_rolls_up_to_the_kol_and_the_group(): void
     {
-        $kols = $this->income(['level' => 2])->assertOk()->assertJsonPath('netProfit', 300000);
+        $kols = $this->income(['level' => 2])->assertOk()->assertJsonPath('level', 2)->assertJsonPath('netProfit', 300000);
         $this->assertSame(['41'], $this->codes($kols->json('revenue.rows')));
         $this->assertSame(['51'], $this->codes($kols->json('expenses.rows')));
 
-        $groups = $this->income(['level' => 1])->assertOk()->assertJsonPath('netProfit', 300000);
+        $groups = $this->income(['level' => 1])->assertOk()->assertJsonPath('level', 1)->assertJsonPath('netProfit', 300000);
         $this->assertSame(['4'], $this->codes($groups->json('revenue.rows')));
         $this->assertSame(['5'], $this->codes($groups->json('expenses.rows')));
         $this->assertSame(1, $groups->json('revenue.rows.0.level'));
@@ -227,11 +225,11 @@ class StatementReportsTest extends TestCase
 
     public function test_the_balance_sheet_rolls_up_to_the_kol_and_the_group(): void
     {
-        $kols = $this->balanceSheet(['level' => 2])->assertOk()->assertJsonPath('balanced', true);
+        $kols = $this->balanceSheet(['level' => 2])->assertOk()->assertJsonPath('level', 2)->assertJsonPath('balanced', true);
         $this->assertSame(['11'], $this->codes($kols->json('assets.rows')));
         $this->assertSame(['31'], $this->codes($kols->json('equity.rows')));
 
-        $groups = $this->balanceSheet(['level' => 1])->assertOk()->assertJsonPath('balanced', true);
+        $groups = $this->balanceSheet(['level' => 1])->assertOk()->assertJsonPath('level', 1)->assertJsonPath('balanced', true);
         $this->assertSame(['1'], $this->codes($groups->json('assets.rows')));
         $this->assertSame(['3'], $this->codes($groups->json('equity.rows')));
     }
