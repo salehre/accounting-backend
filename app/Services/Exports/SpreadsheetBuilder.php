@@ -48,11 +48,41 @@ final class SpreadsheetBuilder
         $this->writer->openToFile($this->path);
         $this->writer->getCurrentSheet()->setName($this->safeName($sheetName));
 
-        $this->titleStyle = (new Style())->setFontBold()->setFontSize(14);
-        $this->headerStyle = (new Style())->setFontBold()->setBackgroundColor('D9D9D9');
-        $this->boldStyle = (new Style())->setFontBold();
-        $this->moneyStyle = (new Style())->setFormat('#,##0');
-        $this->boldMoneyStyle = (new Style())->setFontBold()->setFormat('#,##0');
+        $this->titleStyle = self::style([['FontBold', true], ['FontSize', 14]]);
+        $this->headerStyle = self::style([['FontBold', true], ['BackgroundColor', 'D9D9D9']]);
+        $this->boldStyle = self::style([['FontBold', true]]);
+        $this->moneyStyle = self::style([['Format', '#,##0']]);
+        $this->boldMoneyStyle = self::style([['FontBold', true], ['Format', '#,##0']]);
+    }
+
+    /**
+     * Builds a style with either naming of the library: "withFontBold" (immutable, newer)
+     * or "setFontBold" (mutable, older). The first one that exists is used.
+     *
+     * @param array<int, array{0: string, 1: mixed}> $settings
+     */
+    private static function style(array $settings): Style
+    {
+        $style = new Style();
+
+        foreach ($settings as [$name, $value]) {
+            foreach (['with', 'set'] as $prefix) {
+                $method = $prefix.$name;
+
+                if (method_exists($style, $method)) {
+                    $result = $style->{$method}($value);
+                    if ($result instanceof Style) {
+                        $style = $result;
+                    }
+
+                    continue 2;
+                }
+            }
+
+            throw new \RuntimeException("The spreadsheet library has no style setting \"{$name}\" (tried with{$name} and set{$name}).");
+        }
+
+        return $style;
     }
 
     public function title(string $text): void
