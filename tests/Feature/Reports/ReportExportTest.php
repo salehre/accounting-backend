@@ -192,7 +192,7 @@ class ReportExportTest extends TestCase
 
         $details = json_decode((string) $log->details, true);
         $this->assertSame('trial-balance', $details['report']);
-        $this->assertSame($this->year, $details['query']['fiscalYearId']);
+        $this->assertSame((string) $this->year, (string) $details['query']['fiscalYearId']);
         $this->assertSame('2', (string) $details['query']['level']);
     }
 

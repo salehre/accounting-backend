@@ -87,29 +87,29 @@ final class SpreadsheetBuilder
 
     public function title(string $text): void
     {
-        $this->writer->addRow(Row::fromValues([$text], $this->titleStyle));
+        $this->styledRow([$text], $this->titleStyle);
     }
 
     public function line(string $text): void
     {
-        $this->writer->addRow(Row::fromValues([$text]));
+        $this->styledRow([$text], null);
     }
 
     public function blank(): void
     {
-        $this->writer->addRow(Row::fromValues(['']));
+        $this->styledRow([''], null);
     }
 
     /** A bold row with a single text (the name of a section). */
     public function section(string $text): void
     {
-        $this->writer->addRow(Row::fromValues([$text], $this->boldStyle));
+        $this->styledRow([$text], $this->boldStyle);
     }
 
     /** @param array<int, string> $labels */
     public function header(array $labels): void
     {
-        $this->writer->addRow(Row::fromValues($labels, $this->headerStyle));
+        $this->styledRow($labels, $this->headerStyle);
     }
 
     /** @param array<int, mixed> $values */
@@ -155,6 +155,23 @@ final class SpreadsheetBuilder
         if ($this->open) {
             $this->discard();
         }
+    }
+
+    /**
+     * One row whose cells all share the same style. Built from cells on purpose:
+     * the parameters of Row::fromValues() differ between versions of the library.
+     *
+     * @param array<int, mixed> $values
+     */
+    private function styledRow(array $values, ?Style $style): void
+    {
+        $cells = [];
+
+        foreach (array_values($values) as $value) {
+            $cells[] = Cell::fromValue($value ?? '', $style);
+        }
+
+        $this->writer->addRow(new Row($cells));
     }
 
     /** @param array<int, mixed> $values */
