@@ -19,6 +19,7 @@ final class Permissions
         'fiscal-years.manage',
         'fiscal-years.close',
         'reports.read',
+        'reports.export',
         'users.manage',
     ];
 }

@@ -7,6 +7,7 @@ use App\Http\Controllers\DetailAccountController;
 use App\Http\Controllers\FiscalYearController;
 use App\Http\Controllers\JournalEntryController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\YearEndController;
 use Illuminate\Support\Facades\DB;
@@ -118,6 +119,18 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         ->middleware('permission:reports.read');
     Route::get('reports/journal', [ReportController::class, 'journal'])
         ->middleware('permission:reports.read');
+
+    // Excel exports of the reports (a separate permission: the data leaves the system)
+    Route::get('reports/trial-balance/export', [ReportExportController::class, 'trialBalance'])
+        ->middleware('permission:reports.export');
+    Route::get('reports/ledger/export', [ReportExportController::class, 'ledger'])
+        ->middleware('permission:reports.export');
+    Route::get('reports/income-statement/export', [ReportExportController::class, 'incomeStatement'])
+        ->middleware('permission:reports.export');
+    Route::get('reports/balance-sheet/export', [ReportExportController::class, 'balanceSheet'])
+        ->middleware('permission:reports.export');
+    Route::get('reports/journal/export', [ReportExportController::class, 'journal'])
+        ->middleware('permission:reports.export');
 
     // User management (administrators only)
     Route::get('roles', [UserController::class, 'roles'])
